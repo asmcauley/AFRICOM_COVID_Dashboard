@@ -1,0 +1,328 @@
+---
+title: "Investigation of Potential COVID 19 3rd Wave in Selected African Nations"
+author: "Aubrey Smiley McAuliffe \n OI/OPR"
+date: "`r Sys.Date()`"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+
+```{r, include = FALSE, warning = FALSE, message = FALSE}
+library(data.table)
+library(ggplot2)
+library(flexdashboard)
+library(dplyr)
+library(car)
+library(plotly)
+library(reshape2)
+library(hrbrthemes)
+library(grid)
+library(RColorBrewer)
+library(directlabels)
+library(tidyverse)
+library(tidyr)
+library(scales)
+library(lubridate)
+df <- read.csv("~/AFRICOM COVID Weekly/AFRICOM_COVID_Data_.csv")
+Country_Names = c("Botswana", "Eswatini", "Lesotho", "Malawi", "Mozambique", "South Africa", "Zambia", "Zimbabwe")
+Af_nations = df[df$location %in% Country_Names,]
+nb.cols = 8
+colnames(Af_nations)[3] = "Country"
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+mycolors <- colorRampPalette(cbbPalette)(nb.cols)
+Af_nations$date = as.Date(Af_nations$date)
+Af_nations0 = Af_nations %>% drop_na(total_tests_per_thousand)
+Af_nations2 = Af_nations %>% drop_na(positive_rate)
+Af_nations3 = Af_nations %>% drop_na(total_vaccinations_per_hundred)
+vaccinations = Af_nations3 %>% 
+  group_by(Country) %>%
+  slice(which.max(as.Date(date, '%m/%d/%Y')))
+vaccinations$vax_pct = vaccinations$total_vaccinations_per_hundred/100
+df = Af_nations
+df$date=as.Date(df$date)
+ninety = df %>% filter(date >= today() - days(90))
+two_weeks = df %>% filter(date >= today() - days(14))
+thirty = df %>% filter(date >= today() - days(30))
+ninety$date = as.character(ninety$date)
+two_weeks$date = as.character(two_weeks$date)
+ninety_new = data.frame(ninety$Country, ninety$date, ninety$new_cases_smoothed)
+ninety_newM = data.frame(ninety$Country, ninety$date, ninety$new_cases_smoothed_per_million)
+twoweek_new = data.frame(two_weeks$Country, two_weeks$date, two_weeks$new_cases_smoothed)
+twoweek_newM = data.frame(two_weeks$Country, two_weeks$date, two_weeks$new_cases_smoothed_per_million)
+new_cases_90 = spread(ninety_new, ninety.date, ninety.new_cases_smoothed)
+new_cases_14 = spread(twoweek_new, two_weeks.date, two_weeks.new_cases_smoothed)
+new_casesM_90 = spread(ninety_newM, ninety.date, ninety.new_cases_smoothed_per_million)
+new_casesM_14 = spread(twoweek_newM, two_weeks.date, two_weeks.new_cases_smoothed_per_million)
+new_cases_90$Total = rowSums(new_cases_90[,2:91])
+new_casesM_90$Total = rowSums(new_casesM_90[,2:91])
+new_cases_14$Total = rowSums(new_cases_14[,2:15])
+new_casesM_14$Total = rowSums(new_casesM_14[,2:15])
+colnames(new_cases_90)[1] = "Country"
+colnames(new_casesM_90)[1] = "Country"
+colnames(new_cases_14)[1] = "Country"
+colnames(new_casesM_14)[1] = "Country"
+ks <- function (x) { number_format(accuracy = 1,
+                                   scale = 1/1000,
+                                   suffix = "k",
+                                   big.mark = ",")(x) }
+tots90 = aggregate(ninety$total_deaths, by = list(Category = ninety$Country), FUN = max)
+tots90M = aggregate(ninety$total_deaths_per_million, by = list(Category = ninety$Country), FUN = max)
+tottable = data.frame(tots90$Category, round(tots90$x, 0), round(tots90M$x,0))
+colnames(tottable) = c("Country", "Total Deaths", "Total Deaths /1M Pop")
+tottable_deaths = tottable[order(-tottable$`Total Deaths /1M Pop`),]
+tots90 = aggregate(ninety$new_cases_smoothed, by = list(Category = ninety$Country), FUN = sum)
+tots90M = aggregate(ninety$new_cases_smoothed_per_million, by = list(Category = ninety$Country), FUN = sum)
+tottable = data.frame(tots90$Category, round(tots90$x, 0), round(tots90M$x,0))
+colnames(tottable) = c("Country", "New Cases", "New Cases /1M Pop")
+tottable = tottable[order(-tottable$`New Cases /1M Pop`),]
+new90 = new_cases_90[order(-new_cases_90$Total),]
+new90M = new_casesM_90[order(-new_casesM_90$Total),]
+new14 = new_cases_14[order(-new_cases_14$Total),]
+new14M = new_casesM_14[order(-new_casesM_14$Total),]
+new90 = gather(new90, date, new_cases_smoothed, -Country)
+new14 = gather(new14, date, new_cases_smoothed, -Country)
+new90M = gather(new90M, date, new_cases_smoothed_per_million, -Country)
+new14M = gather(new14M, date, new_cases_smoothed_per_million, -Country)
+new90$date = as.Date(new90$date)
+new90M$date = as.Date(new90M$date)
+new14M$date = as.Date(new14M$date)
+new14$date = as.Date(new14$date)
+```
+
+Overview
+===
+
+
+Row {data-height=200}
+-----------------------------------------------------------------------
+
+### Summary
+
+South Africa’s new cases have fallen this week, but have generally been rising. South Africa, Zambia, and Botswana are at risk of a third wave, with cases creeping up recently. Positive test rates have been rising in South Africa, Zambia, and Mozambique. South Africa’s rising test positivity, coupled with falling numbers of new cases, could indicate better targeted testing of people who are actually showing symptoms. 
+
+Row {data-height=400}
+-----------------------------------------------------------------------
+
+### New Cases and New Cases Per Million
+
+```{r}
+knitr::kable(tottable, booktabs = TRUE, padding = 0,  row.names = F) 
+```
+
+### 90 Days New Cases
+
+```{r}
+ggplot(new90, aes(x=date, y=new_cases_smoothed, group=Country, color=Country)) +
+    geom_line(size = 1) +
+    scale_colour_manual(values = mycolors, drop = TRUE) +
+    ggtitle("Daily New Cases (Last 90 Days)") +
+    scale_x_date(date_labels = "%m-%d-%Y", breaks = pretty_breaks(6), expand = c(0,0))+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    scale_y_continuous(labels = ks, limit = c(0,5000), expand = c(0,0))+
+    ylab("Confirmed New Cases")+
+    xlab("Date")
+```
+
+
+### 90 Days New Cases per Million
+
+```{r}
+ggplot(new90M, aes(x=date, y=new_cases_smoothed_per_million, group=Country, color=Country)) +
+    geom_line(size = 1) +
+    scale_colour_manual(values = mycolors, drop = TRUE) +
+    ggtitle("Daily New Cases/M (Last 90 Days)") +
+    scale_x_date(date_labels = "%m-%d-%Y", breaks = pretty_breaks(6), expand = c(0,0))+
+    scale_y_continuous(limit = c(0,225), expand = c(0,0))+
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+    ylab("Confirmed New Cases")+
+    xlab("Date")
+```
+
+
+Row {data-height=400}
+-----------------------------------------------------------------------
+
+
+### Vaccinations
+
+```{r}
+ggplot(vaccinations, aes(x=reorder(Country, total_vaccinations_per_hundred), y=vax_pct, fill = Country)) + 
+  geom_bar(stat = "identity", show.legend = FALSE)+
+  scale_fill_manual(values = mycolors, drop = TRUE)+
+  coord_flip()+
+  scale_y_continuous(expand = c(0,0.001))+
+  xlab("Country")+
+  ylab("Percent Vaccinated")+
+  scale_y_continuous(labels = scales::percent, limits = c(0, 0.08), expand = c(0,0))+
+  ggtitle("Percent of Population Vaccinated, by Nation")
+```
+
+
+### Testing
+
+
+```{r}
+ggplot( Af_nations0, aes(x=date, y=total_tests_per_thousand, group=Country, color=Country)) +
+    geom_line(size = 1) +
+    scale_colour_manual(values = mycolors, drop = TRUE) +
+    #geom_dl(aes(label = Country), method = list(dl.trans(x = x + 0.3), "last.points", cex = 0.8)) +
+    ggtitle("Total COVID-19 tests per 1,000: How are testing rates changing?") +
+    scale_x_date(date_labels = "%m-%Y", limit=c(as.Date("2020-06-15"),Sys.Date()), expand = c(0,0) )+
+    ylab("Total tests per thousand")+
+    xlab("Date")
+```
+
+
+### Positive Test Rate
+
+
+```{r}
+ggplot( Af_nations2, aes(x=date, y=positive_rate, group=Country, color=Country)) +
+    geom_line(size = 1) +
+    scale_colour_manual(values = mycolors, drop = TRUE) +
+    #geom_dl(aes(label = Country), method = list(dl.trans(x = x + 0.3), "last.points", cex = 0.8)) +
+    ggtitle("Share of COVID-19 Tests that Were Positive") +
+    scale_x_date(date_labels = "%m-%Y", limit=c(as.Date("2020-06-15"),Sys.Date()), expand = c(0,0) )+
+    scale_y_continuous(labels = scales::percent, limits = c(0, 0.35))+
+    ylab("Positive Test Rate")+
+    xlab("Date")
+```
+
+
+Cases and Deaths over Time
+===
+
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### Daily New Cases over Last 30 Days
+```{r, echo = FALSE}
+thirty$date = as.Date(thirty$date)
+thirty$Day = day(thirty$date)
+daily = thirty %>% group_by(Country, Day)%>%
+  mutate(hover = paste0(Country, "\n", new_cases_smoothed))
+
+graph_properties <- list(
+  scope = 'africa',
+  showland = TRUE,
+  lakecolor = toRGB('white'),
+  landcolor = toRGB("white"),
+  color = toRGB("white")
+)
+
+font = list(
+  family = "DM Sans",
+  size = 15,
+  color = "black"
+)
+
+label = list(
+  bgcolor = "#EEEEEE",
+  bordercolor = "transparent",
+  font = font
+)
+
+Daily_Cases = plot_geo(daily, locationmode = 'country names', frame = ~Day) %>%
+  add_trace(locations = ~daily$Country,
+            z = ~daily$new_cases_smoothed,
+            zmin = 0,
+            zmax = max(daily$new_cases_smoothed)*0.75,
+            color = ~daily$new_cases_smoothed,
+            colorscale = "Cividis",
+            text = ~hover,
+            hoverinfo = 'text') %>%
+  layout(geo = graph_properties,
+         title = "New Cases by Country over Last 30 Days",
+         font = list(family = "DM Sans")) %>%
+  config(displayModeBar = FALSE) %>%
+  style(hoverlabel = label) %>%
+  colorbar(title = "Daily New Cases")
+
+Daily_Cases
+```
+
+
+### Daily New Cases per Million over Last 30 Days
+
+
+```{r}
+daily = thirty %>% group_by(Country, Day)%>%
+  mutate(hover = paste0(Country, "\n", new_cases_smoothed_per_million))
+Daily_CasesM = plot_geo(daily, locationmode = 'country names', frame = ~Day) %>%
+  add_trace(locations = ~daily$Country,
+            z = ~daily$new_cases_smoothed_per_million,
+            zmin = 0,
+            zmax = max(daily$new_cases_smoothed_per_million),
+            color = ~daily$new_cases_smoothed_per_million,
+            colorscale = "Cividis",
+            text = ~hover,
+            hoverinfo = 'text') %>%
+  layout(geo = graph_properties,
+         title = "New Cases per Million by Country over Last 30 Days",
+         font = list(family = "DM Sans")) %>%
+  config(displayModeBar = FALSE) %>%
+  style(hoverlabel = label) %>%
+  colorbar(title = "Daily New Cases\n /M")
+
+Daily_CasesM
+```
+
+
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+
+### Daily New Deaths over Last 30 Days
+
+
+```{r}
+daily = thirty %>% group_by(Country, Day)%>%
+  mutate(hover = paste0(Country, "\n", new_deaths_smoothed))
+Daily_Deaths = plot_geo(daily, locationmode = 'country names', frame = ~Day) %>%
+  add_trace(locations = ~daily$Country,
+            z = ~daily$new_deaths_smoothed,
+            zmin = 0,
+            zmax = max(daily$new_deaths_smoothed)*0.75,
+            color = ~daily$new_deaths_smoothed,
+            colorscale = "Cividis",
+            text = ~hover,
+            hoverinfo = 'text') %>%
+  layout(geo = graph_properties,
+         title = "New Deaths by Country over Last 30 Days",
+         font = list(family = "DM Sans")) %>%
+  config(displayModeBar = FALSE) %>%
+  style(hoverlabel = label) %>%
+  colorbar(title = "Daily New Deaths")
+
+Daily_Deaths
+```
+
+
+
+### Daily New Deaths per Million over Last 30 Days
+
+
+```{r}
+daily = thirty %>% group_by(Country, Day)%>%
+  mutate(hover = paste0(Country, "\n", new_deaths_smoothed_per_million))
+Daily_deathsM = plot_geo(daily, locationmode = 'country names', frame = ~Day) %>%
+  add_trace(locations = ~daily$Country,
+            z = ~daily$new_deaths_smoothed_per_million,
+            zmin = 0,
+            zmax = max(daily$new_deaths_smoothed_per_million),
+            color = ~daily$new_deaths_smoothed_per_million,
+            colorscale = "Cividis",
+            text = ~hover,
+            hoverinfo = 'text') %>%
+  layout(geo = graph_properties,
+         title = "New Deaths per Million by Country over Last 30 Days",
+         font = list(family = "DM Sans")) %>%
+  config(displayModeBar = FALSE) %>%
+  style(hoverlabel = label) %>%
+  colorbar(title = "Daily New Deaths\n /M")
+
+Daily_deathsM
+```
